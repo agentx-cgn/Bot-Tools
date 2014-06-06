@@ -19,7 +19,7 @@ files = {}
 
 def cleanup() :
   for k, v in files.iteritems() :
-    print("closing: " + k)
+    # print("\nclosing: " + k)
     v.close()
 
 def launch():
@@ -33,7 +33,7 @@ def launch():
 
     for line in iter(process.stdout.readline, b'') :
 
-      sline = line.strip()
+      sline = line.strip() ## removes nl and wp
 
       if sline.startswith("#! terminate") :
         print(sline)
@@ -49,17 +49,16 @@ def launch():
         filename = sline.split(" ")[3]
         files[filenum] = open(filename, 'w')
         files[filenum].truncate()
-        print(": open %s %s " % (filenum, filename))
+        # print(": open %s %s " % (filenum, filename))
 
       elif sline.startswith("#! append ") :
         filenum  = sline.split(" ")[2]
         dataLine = ":".join(sline.split(":")[1:])
-        print(": append %s %s " % (filenum, dataLine))
+        # print(": append %s %s " % (filenum, dataLine))
         files[filenum].write(dataLine + "\n")
 
       elif sline.startswith("#! write ") :
         print(sline)
-        doWrite = True
         filenum  = sline.split(" ")[2]
         filename = sline.split(" ")[3]
         files[filenum] = open(filename, 'w')
@@ -69,20 +68,18 @@ def launch():
       elif sline.startswith("#! close ") :
         print(sline)
         filenum  = sline.split(" ")[2]
-        doWrite = False
         files[filenum].close()    
 
-      elif doWrite :
-        # sys.stdout.write(".") little feedback if needed
-        files[curFileNum].write(line)
+      # elif doWrite :
+      #   # sys.stdout.write(".") little feedback if needed
+      #   files[curFileNum].write(line)
 
       else :
         sys.stdout.write(line)
 
   except KeyboardInterrupt, e :
+    ## Ctrl-c
     pass
-    # cleanup()
-    # print("\nBye\n")
 
 if __name__ == '__main__':
     launch()
