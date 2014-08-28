@@ -27,10 +27,27 @@ mplayer pyro02.mp4
 
 VERSION = "0.1.0"
 
-import subprocess, time, os, sys
+import sys, subprocess, time, os, sys, json
+from time import sleep
 
+sys.dont_write_bytecode = True
+
+from data import data
+
+## the game path
 pyrogenesis = "/Daten/Projects/Osiris/ps/trunk/binaries/system/pyrogenesis"
-cmd0AD = [pyrogenesis, "-quickstart", "-mod=charts", "-autostart=aitest07", "-autostart-ai=1:hannibal"]
+pyrogenesis = "/usr/games/0ad"
+
+## csv data
+analysis    = "/home/noiv/Desktop/0ad/analysis/"
+
+##startup options
+tester      = {"map": "Arcadia 02"}
+
+# cmd0AD = [pyrogenesis, "-quickstart", "-mod=charts", "-autostart=aitest07", "-autostart-ai=1:hannibal"]
+# cmd0AD = [pyrogenesis, "-quickstart", "-mod=charts", "-autostart=ai-village-00", "-autostart-ai=1:hannibal"]
+# cmd0AD = [pyrogenesis, "-quickstart", "-autostart=ai-village-00", "-autostart-ai=1:hannibal"]
+# cmd0AD = [pyrogenesis, "-quickstart", "-autostart=" + tester['map'], "-autostart-ai=1:hannibal"]
 
 files = {}
 
@@ -46,21 +63,73 @@ def xdotool(command) :
 def cleanup() :
   for k, v in files.iteritems() : v.close()
 
-def launch():
+def writeTestData():
+  fTest = open("/home/noiv/.local/share/0ad/mods/public/simulation/ai/hannibal/tester-data.js", 'w')
+  fTest.truncate()
+  fTest.write("var TESTERDATA = " + json.dumps(tester) + ";")
+  fTest.close()
 
-  doWrite = False
-  curFileNum = None
-  idWindow = None
+def killTestData():
+  fTest = open("/home/noiv/.local/share/0ad/mods/public/simulation/ai/hannibal/tester-data.js", 'w')
+  fTest.truncate()
+  fTest.close()
 
-  winX = 1520
-  winY = 20
+def processMaps():
 
   proc0AD = None
 
+  tester["OnUpdate"] = "print('#! terminate');"
+
+  for mp in data["testMaps"] :
+
+    tester["map"] = mp
+    writeTestData()
+    cmd0AD  = [pyrogenesis, "-quickstart", "-autostart=" + mp, "-autostart-ai=1:hannibal"]
+    proc0AD = subprocess.Popen(cmd0AD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    print "  > " + mp
+
+    try:
+
+      for line in iter(proc0AD.stdout.readline, b'') : 
+
+        sline = line.strip() 
+
+        if sline.startswith("#! terminate") :
+          proc0AD.terminate()
+          sleep(2)
+          if proc0AD : proc0AD.wait()
+          if proc0AD : proc0AD.kill()
+          break
+
+        else :
+          pass
+          # sys.stdout.write(line)
+
+    except KeyboardInterrupt, e :
+      if proc0AD : proc0AD.terminate()
+      break
+
+  print "done."
+
+def launch():
+
+  winX = 1520; winY = 20
+
+  doWrite    = False
+  curFileNum = None
+  idWindow   = None
+
+  proc0AD = None
+  cmd0AD = [pyrogenesis, "-quickstart", "-autostart=" + tester['map'], "-autostart-ai=1:hannibal"]
+
+  files["log"] = open("/home/noiv/Desktop/0ad/last.log", 'w')
+  files["log"].truncate()
+
+
   def terminate() :
-    if proc0AD    : proc0AD.terminate()
+    if proc0AD : proc0AD.terminate()
 
-
+  writeTestData()
   proc0AD = subprocess.Popen(cmd0AD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
   try:
@@ -68,6 +137,7 @@ def launch():
     for line in iter(proc0AD.stdout.readline, b'') :
 
       sline = line.strip() ## removes nl and wp
+      files["log"].write(sline + "\n")
 
       if sline.startswith("#! terminate") :
         print(sline)
@@ -125,7 +195,22 @@ def launch():
     terminate()
 
 if __name__ == '__main__':
-    launch()
+
+    args = sys.argv[1:]
+  
+    if len(args) == 0:
+      print "  launching map: " + tester['map']
+      launch()
+    
+    elif args[0] == "maps" :
+      print "  processing maps..."
+      processMaps()
+
+    else:
+      tester['map'] = args[0]
+      print "  launching map: " + tester['map']
+      launch()
+    
     cleanup()
     print("\nBye\n")
 
